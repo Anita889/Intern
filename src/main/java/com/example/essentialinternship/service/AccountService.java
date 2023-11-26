@@ -5,11 +5,13 @@ import com.example.essentialinternship.models.Transactions;
 import com.example.essentialinternship.models.Users;
 
 public interface AccountService {
-    void saveAccount(Accounts account);
+    Accounts saveAccount(Accounts account);
 
     Accounts findById(Integer id);
 
-    Accounts findByUser(Users user);
+    Accounts updateAccountFields(Accounts account);
 
-    void updateAccount(Accounts account, Transactions transactions);
+    Accounts updateAccountPayment(Accounts account);
+
+    Boolean deleteAccount(Integer id);
 }

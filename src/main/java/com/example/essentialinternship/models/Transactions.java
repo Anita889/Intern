@@ -2,10 +2,7 @@ package com.example.essentialinternship.models;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import java.sql.Timestamp;
@@ -15,6 +12,7 @@ import java.sql.Timestamp;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@ToString
 @Table(name = "transactions")
 public class Transactions {
     @Id
@@ -26,5 +24,6 @@ public class Transactions {
     private Timestamp transactionDate;
     @ManyToOne
     @JoinColumn(name = "account_id")
+    @JsonIgnore
     private Accounts account;
 }

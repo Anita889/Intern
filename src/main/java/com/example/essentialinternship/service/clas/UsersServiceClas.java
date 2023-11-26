@@ -4,11 +4,12 @@ import com.example.essentialinternship.exeptions.RepositoryException;
 import com.example.essentialinternship.models.Users;
 import com.example.essentialinternship.repositories.UsersRepository;
 import com.example.essentialinternship.service.UsersService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.Optional;
 
+@Slf4j
 @Service
 public class UsersServiceClas implements UsersService {
     private final UsersRepository usersRepository;
@@ -19,17 +20,16 @@ public class UsersServiceClas implements UsersService {
     }
 
     @Override
-    public void saveUser(Users user) {
-        if (isSaveAble(user))
-            usersRepository.save(user);
+    public Users saveUser(Users user) {
+        if (isSaveAble(user) && usersRepository.findByEmail(user.getEmail())==null)
+           return usersRepository.save(user);
         else
             throw new RepositoryException("Not valid user");
     }
 
     private boolean isSaveAble(Users user){
-        return user.getUserId() != null
-                && user.getAddress() != null
-                && user.getAccounts() != null
+        return
+                 user.getAddress() != null
                 && user.getContactNumber() != null
                 && user.getEmail() != null
                 && user.getFirstName() != null
@@ -55,21 +55,46 @@ public class UsersServiceClas implements UsersService {
     }
 
     @Override
-    public void updateUser(Users user,boolean verifyMessage) {
-        Optional<Users> upDateUser=usersRepository.findById(user.getUserId());
-        if(isSaveAble(user) && upDateUser.isPresent() && verifyMessage)
+    public Users updateUser(Users user,boolean verifyMessage) {
+        if(findById(user.getUserId())!=null)
         {
-                upDateUser.get().setUserId(user.getUserId());
-                upDateUser.get().setAddress(user.getAddress());
-                upDateUser.get().setAccounts(user.getAccounts());
-                upDateUser.get().setContactNumber(user.getContactNumber());
-                upDateUser.get().setEmail(user.getEmail());
-                upDateUser.get().setFirstName(user.getFirstName());
-                upDateUser.get().setLastName(user.getLastName());
-                upDateUser.get().setDateOfBirth(user.getDateOfBirth());
-                upDateUser.get().setPassword(user.getPassword());
-                usersRepository.updateById(upDateUser, user.getUserId());
+            return usersRepository.save((
+                    doUpdateAble(user,
+                    findById(user.getUserId())
+                    )));
         }
-        else throw new RepositoryException("Not valid updateAble user");
+        else
+            throw new RepositoryException("Not valid updateAble user");
     }
+
+    private Users doUpdateAble(Users newUser,Users oldUser) {
+        if(newUser.getPassword()!=null && !newUser.getPassword().equals(oldUser.getPassword()))
+          oldUser.setPassword(newUser.getPassword());
+        if(newUser.getEmail()!=null && !newUser.getEmail().equals(oldUser.getEmail()))
+            oldUser.setEmail(newUser.getEmail());
+        if(newUser.getAddress()!=null && !newUser.getAddress().equals(oldUser.getAddress()))
+            oldUser.setAddress(newUser.getAddress());
+        if(newUser.getFirstName()!=null && !newUser.getFirstName().equals(oldUser.getFirstName()))
+            oldUser.setFirstName(newUser.getFirstName());
+        if(newUser.getLastName()!=null && !newUser.getLastName().equals(oldUser.getLastName()))
+            oldUser.setLastName(newUser.getLastName());
+        if(newUser.getDateOfBirth()!=null && !newUser.getDateOfBirth().equals(oldUser.getDateOfBirth()))
+            oldUser.setDateOfBirth(newUser.getDateOfBirth());
+        if(newUser.getContactNumber()!=null && !newUser.getContactNumber().equals(oldUser.getContactNumber()))
+            oldUser.setContactNumber(newUser.getContactNumber());
+        return oldUser;
+    }
+
+    @Override
+    public Boolean deleteUser(Integer id) {
+        try {
+            usersRepository.deleteById(id);
+            return true;
+        }
+        catch (RepositoryException e){
+            throw e;
+        }
+    }
+
 }
+

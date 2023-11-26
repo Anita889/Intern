@@ -2,46 +2,76 @@ package com.example.essentialinternship.service.clas;
 
 
 import com.example.essentialinternship.exeptions.RepositoryException;
+import com.example.essentialinternship.exeptions.TransactionalException;
 import com.example.essentialinternship.models.Accounts;
 import com.example.essentialinternship.models.Transactions;
 import com.example.essentialinternship.models.Users;
 import com.example.essentialinternship.repositories.AccountRepository;
 import com.example.essentialinternship.repositories.UsersRepository;
 import com.example.essentialinternship.service.AccountService;
+import com.example.essentialinternship.service.TransactionService;
+import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
+
+@Slf4j
 @Service
 public class AccountServiceClas implements AccountService {
     private final AccountRepository accountRepository;
     private final UsersRepository usersRepository;
 
+    private final TransactionService transactionService;
+
     @Autowired
-    public AccountServiceClas(AccountRepository accountRepository, UsersRepository usersRepository) {
+    public AccountServiceClas(AccountRepository accountRepository,
+                              UsersRepository usersRepository, TransactionService transactionService) {
         this.accountRepository = accountRepository;
         this.usersRepository = usersRepository;
+        this.transactionService = transactionService;
     }
 
     @Override
-    public void saveAccount(Accounts account) {
+    @Transactional
+    public Accounts saveAccount(Accounts account) {
         if (isSaveAbleAccount(account)) {
-            account.setUsers(usersRepository.findByEmail(account.getEmail()));
-            accountRepository.save(account);
-        }        else
+            //find user of this new account
+            Users user=usersRepository.findByEmail(account.getEmail());
+            account.setUsers(user);
+            //create new transaction of creation account
+            Transactions transaction=transactionService.createTransaction("Create",
+                    account.getBalance(),account);
+            List<Transactions> list=new ArrayList<>();
+            list.add(transaction);
+            account.setTransactions(list);
+            return accountRepository.save(account);
+        }
+        else
             throw new RepositoryException("Not valid account save");
     }
-
     private boolean isSaveAbleAccount(Accounts account){
-        return account.getAccountId()!=null
-                && account.getAccountType()!=null
-                && account.getUsers()!=null
+        return
+                accountRepository.findByPassword(account.getPassword())==null
+                &&  account.getAccountType()!=null
                 && account.getBalance()!=null
-                && account.getOpenDate()!=null
-                && account.getEmail()!=null;
+                && account.getEmail()!=null
+                && account.getPassword()!=null;
     }
-
+    private Accounts readyToUpdate(Accounts oldAccount,Accounts newAccount){
+        if(oldAccount.getAccountType()!=newAccount.getAccountType() && newAccount.getAccountType()!=null)
+            oldAccount.setAccountType(newAccount.getAccountType());
+        if(!Objects.equals(oldAccount.getEmail(), newAccount.getEmail()) && newAccount.getEmail()!=null)
+            oldAccount.setEmail(newAccount.getEmail());
+        if(!Objects.equals(oldAccount.getPassword(), newAccount.getPassword()) && newAccount.getPassword()!=null){
+            oldAccount.setPassword(newAccount.getPassword());
+        }
+            return oldAccount;
+    }
     @Override
     public Accounts findById(Integer id) {
         if(accountRepository.findById(id).isPresent())
@@ -50,28 +80,44 @@ public class AccountServiceClas implements AccountService {
              throw new RepositoryException("Not account find by this id");
     }
 
-    @Override
-    public Accounts findByUser(Users user) {
-     if(accountRepository.findByUser(user)!=null)
-        return accountRepository.findByUser(user);
-     else
-         throw new RepositoryException("Not account find by this user");
-    }
 
     @Override
-    public void updateAccount(Accounts account, Transactions transactions) {
-      if(isSaveAbleAccount(account)){
-          Accounts accountUpdate=accountRepository.findByUser(account.getUsers());
-          accountUpdate.setAccountId(account.getAccountId());
-          accountUpdate.setAccountType(account.getAccountType());
-          accountUpdate.setUsers(account.getUsers());
-          accountUpdate.setBalance(account.getBalance());
-          List<Transactions> listTrans=account.getTransactions();
-          listTrans.add(transactions);
-          accountUpdate.setTransactions(listTrans);
-          accountRepository.updateAccounts(accountUpdate,account.getAccountId());
+    @Transactional
+    public Accounts updateAccountFields(Accounts account) {
+      if(accountRepository.findById(account.getAccountId()).isPresent()){
+          Accounts accountUpdate=accountRepository.findById(account.getAccountId()).get();
+          return accountRepository.save(readyToUpdate(accountUpdate,account));
       }
       else
           throw new RepositoryException("Not updateAble account");
+    }
+
+    @Override
+    public Accounts updateAccountPayment(Accounts account) {
+        // for payment
+        // *new account balance is payment value,so it is payment
+        Accounts repoAccount=accountRepository.findByPassword(account.getPassword());
+        if(repoAccount.getBalance()>account.getBalance()) {
+            Transactions transaction = transactionService.createTransaction("Payment",
+                    account.getBalance(), repoAccount);
+            repoAccount.setBalance(repoAccount.getBalance() - account.getBalance());
+            List<Transactions> list = repoAccount.getTransactions();
+            list.add(transaction);
+            repoAccount.setTransactions(list);
+            return accountRepository.save(repoAccount);
+        }
+        else
+            throw new TransactionalException("Violation of payment");
+    }
+
+    @Override
+    public Boolean deleteAccount(Integer id) {
+        try {
+            accountRepository.deleteById(id);
+            return true;
+        }
+        catch (Exception e){
+            throw new RepositoryException("User not delete");
+        }
     }
 }
